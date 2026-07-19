@@ -51,3 +51,13 @@
 - **Production Pattern:** In a production setting, we would explicitly provision two distinct database roles:
   1. An `admin` or `etl_role` that the Airflow and FastAPI services use to write data.
   2. An `analyst_role` or `readonly_user` that is strictly granted read-only access. This enforces the Principle of Least Privilege, completely protecting the raw data and intermediate states while safely exposing the curated dimensional models.
+
+## 11. Orchestration: Why Apache Airflow?
+**Decision:** We chose Apache Airflow for orchestrating the ELT (Extract, Load, Transform) pipeline in tandem with dbt (data build tool).
+- **Context:** In modern data architecture, we must first *extract and load* the raw data (via our Python ingestion scripts) before we *transform* it into clean, usable models (via our SQL-based `dbt` models). While a simple cron script could trigger this, Airflow natively supports DAGs (Directed Acyclic Graphs), allowing us to strictly orchestrate these dependencies. It ensures that the transformation steps (`dbt run` and `dbt test`) only execute after the data ingestion step has successfully completed. 
+- **Idempotency & Visibility:** Airflow gives us a clear UI to monitor task states, view logs, and manually trigger backfills using parameters (like our `reprocess_pattern`). It's the industry standard for Python-based orchestrations.
+
+## 12. Exponential Backoff Requirement
+**Decision:** Exponential backoff on retries is handled natively by Airflow rather than implementing custom backoff logic in Python scripts.
+- **Context:** The ingestion layer might experience transient errors (e.g. MinIO connection drops, Postgres lock timeouts). Implementing custom exponential backoff inside the task itself would hold up worker threads (e.g., using `time.sleep()`).
+- **Implementation:** By leveraging Airflow's built-in parameters (`retry_exponential_backoff=True`, `retry_delay`, and `max_retry_delay`), Airflow automatically handles the backoff logic. If a task fails, Airflow releases the Celery worker and reschedules the task for the future (e.g. 1 min, 2 mins, 4 mins later). This allows workers to pick up other tasks in the meantime, resulting in a much more resilient and efficient distributed system.

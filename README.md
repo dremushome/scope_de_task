@@ -100,7 +100,8 @@ If this is your first time spinning up the project, follow these steps to see th
 
 3. **Run the Airflow DAG**
    - Open [Apache Airflow](http://localhost:8080) in your browser and log in with `airflow` / `airflow`.
-   - You should see a DAG named something like `corporate_ratings_pipeline`.
+   - You should see a DAG named `raw_ratings_ingestion`.
+   - **Important:** Click the toggle switch next to the DAG name to **unpause** it first.
    - Click the **"Trigger DAG"** (play button) to start the run.
    - Click on the DAG to watch the tasks succeed in the Graph or Grid view as it ingests the files, parses them, and runs the `dbt` models.
    - **Check MinIO Again:** Once the DAG finishes, if you look back at MinIO, you will see the `landing` bucket is empty again, and all the files have been safely moved to the `archive` bucket!
