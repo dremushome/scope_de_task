@@ -4,6 +4,17 @@ A containerized, production-grade data pipeline that orchestrates the ingestion,
 
 ---
 
+## Architecture & Technology Stack
+
+- **Extraction & Loading:** Custom Python ingestion scripts (`openpyxl`, `pydantic`)
+- **Transformation (ELT):** `dbt` (data build tool) for SQL-based dimensional modeling
+- **Orchestration:** Apache Airflow strictly manages the ELT dependency graph (Ingestion -> dbt run -> dbt test)
+- **Data Warehouse:** PostgreSQL
+- **Object Storage:** MinIO (S3-compatible) for raw file archiving
+- **Data API:** FastAPI application to serve the modeled facts and dimensions
+
+---
+
 ## Project Structure
 
 * **`dags/`**: Apache Airflow DAGs orchestrating the pipeline.
@@ -99,6 +110,8 @@ If this is your first time spinning up the project, follow these steps to see th
    *You can verify the files arrived by logging into the [MinIO Console](http://localhost:9001) using `minioadmin` / `minioadmin` and checking the `landing` bucket.*
 
 3. **Run the Airflow DAG**
+   - The DAG is configured to run automatically on a `@daily` schedule, assuming analysts upload their files throughout the day.
+   - To see it run immediately for this walkthrough, you can trigger it manually:
    - Open [Apache Airflow](http://localhost:8080) in your browser and log in with `airflow` / `airflow`.
    - You should see a DAG named `raw_ratings_ingestion`.
    - **Important:** Click the toggle switch next to the DAG name to **unpause** it first.
@@ -106,7 +119,20 @@ If this is your first time spinning up the project, follow these steps to see th
    - Click on the DAG to watch the tasks succeed in the Graph or Grid view as it ingests the files, parses them, and runs the `dbt` models.
    - **Check MinIO Again:** Once the DAG finishes, if you look back at MinIO, you will see the `landing` bucket is empty again, and all the files have been safely moved to the `archive` bucket!
 
+   > [!TIP]
+   > **Reprocessing Archived Data (Backfilling):** If you update the JSON Schema or modify the `ExcelParser` logic, you can force the pipeline to re-parse previously archived files without needing to re-upload them. In Airflow, click **"Trigger DAG w/ config"** (the play button with a gear). Set the `reprocess_pattern` parameter to a wildcard (e.g., `*` for all files, or `corporates_A*.xlsm`). The DAG will pull the files directly from the MinIO `archive` bucket and force-reload them.
+
 4. **Query the Data API**
    Once the DAG completes successfully, the data is in the Data Warehouse.
    - Open the [FastAPI Swagger UI](http://localhost:8000/docs).
    - Try executing the `GET /snapshots/latest` endpoint to see the final, modeled credit ratings data served directly from the `marts.dim_corporate_ratings` table!
+
+---
+
+## Documentation Directory
+
+For deep dives into specific areas of the project, please refer to the dedicated documentation files:
+
+* [**DESIGN_DECISIONS.md**](DESIGN_DECISIONS.md): Detailed architectural choices, explaining our ELT pattern, surrogate keys, Airflow retries, dimensional modeling, and API endpoints.
+* [**dwh/dbt/README.md**](dwh/dbt/README.md): Details specifically regarding the `dbt` transformations, data lineage, and schemas.
+* [**AI_USAGE.md**](AI_USAGE.md): A log of how AI assistants (like ChatGPT/Claude) were utilized during the development of this task.

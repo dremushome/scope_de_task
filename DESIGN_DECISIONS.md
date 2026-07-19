@@ -61,3 +61,12 @@
 **Decision:** Exponential backoff on retries is handled natively by Airflow rather than implementing custom backoff logic in Python scripts.
 - **Context:** The ingestion layer might experience transient errors (e.g. MinIO connection drops, Postgres lock timeouts). Implementing custom exponential backoff inside the task itself would hold up worker threads (e.g., using `time.sleep()`).
 - **Implementation:** By leveraging Airflow's built-in parameters (`retry_exponential_backoff=True`, `retry_delay`, and `max_retry_delay`), Airflow automatically handles the backoff logic. If a task fails, Airflow releases the Celery worker and reschedules the task for the future (e.g. 1 min, 2 mins, 4 mins later). This allows workers to pick up other tasks in the meantime, resulting in a much more resilient and efficient distributed system.
+
+## 13. Daily Batch Scheduling
+**Decision:** The Airflow DAG is scheduled to run `@daily`.
+- **Context:** Rather than triggering a pipeline run immediately upon every single file upload, running the pipeline daily allows financial analysts to upload multiple iterations or batches of rating sheets throughout the workday. The pipeline then picks up the entire batch at midnight, running the heavy `dbt` dimensional models just once per day to serve fresh data for the next morning. It can still be triggered manually on-demand if immediate processing is required.
+
+## 15. Idempotency & Manual Backfilling
+**Decision:** The ingestion pipeline is strictly idempotent by default, but supports targeted manual overrides.
+- **Context:** If a file is uploaded multiple times without changes, reprocessing it wastes compute. However, if Data Engineering deploys a new version of the Python parser or updates the schema bounds, we need a way to easily "replay" historical files through the new logic.
+- **Implementation:** By default, the `db_loader` checks a combination of the `upload_id`, `schema_sha`, and `parser_sha`. If the exact file was already processed with the exact same parser code and schema config, it is safely skipped. To trigger a backfill, a user can manually trigger the DAG in Airflow with a `reprocess_pattern` parameter (e.g., `*` or `corporates_A*`). The DAG will fetch the physical files from the MinIO archive bucket and force-reprocess them, automatically generating new dimension and fact records down the line.

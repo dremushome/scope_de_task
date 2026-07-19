@@ -172,7 +172,7 @@ def scan_and_ingest_files(**context):
     default_args=default_args,
     description='Scans MinIO/S3 ratings-bucket and ingests raw rating xlsm spreadsheets into PostgreSQL',
     start_date=datetime(2026, 1, 1),
-    schedule=None, # Run manually or triggered externally
+    schedule='@daily',
     catchup=False,
     params={
         "reprocess_pattern": Param(
