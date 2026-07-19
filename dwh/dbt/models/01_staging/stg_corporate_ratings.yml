@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: stg_corporate_ratings
+    description: "Staged corporate ratings with parsed payload fields and SQL-inferred analysis date."
+    columns:
+      - name: id
+        description: "Staging primary key."
+        tests:
+          - unique
+          - not_null
+      - name: company_name
+        tests:
+          - not_null
+

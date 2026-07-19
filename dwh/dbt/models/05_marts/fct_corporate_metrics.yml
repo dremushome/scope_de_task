@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: fct_corporate_metrics
+    description: "Unpivoted year-based credit metrics for each corporate rating."
+    columns:
+      - name: rating_id
+        tests:
+          - not_null
+      - name: company_name
+        tests:
+          - not_null
+      - name: metric_name
+        tests:
+          - not_null
+      - name: metric_year
+        tests:
+          - not_null
+      - name: metric_year_type
+        description: "Classification of the year period (Actual, Estimate, Pro-forma, Restated, Forecast, or Unknown)."
+        tests:
+          - not_null

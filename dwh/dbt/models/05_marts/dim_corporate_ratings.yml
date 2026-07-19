@@ -1,0 +1,63 @@
+version: 2
+models:
+- name: dim_corporate_ratings
+  description: Latest deduplicated active corporate dimension for each company.
+  columns:
+  - name: id
+    description: Unique identifier for the rating evaluation event.
+    tests:
+    - unique
+    - not_null
+  - name: company_name
+    description: Company name (not unique in SCD Type 2).
+    tests:
+    - not_null
+  - name: operating_profitability
+    description: Operating profitability
+  - name: interest_cover
+    description: Interest cover
+  - name: cash_flow_cover
+    description: Cash flow cover
+  - name: business_risk_profile
+    description: Business risk profile
+  - name: market_share
+    description: Market share
+  - name: sector_company_specific_factors_1
+    description: Sector/company-specific factors (1)
+  - name: sector_company_specific_factors_2
+    description: Sector/company-specific factors (2)
+  - name: diversification
+    description: Diversification
+  - name: leverage
+    description: Leverage
+  - name: financial_risk_profile
+    description: Financial risk profile
+  - name: segmentation_criteria
+    description: Segmentation criteria
+  - name: blended_industry_risk_profile
+    description: (Blended) Industry risk profile
+  - name: liquidity
+    description: Liquidity
+  - name: competitive_positioning
+    description: Competitive Positioning
+  - name: rating_methodologies_applied
+    description: Array of rating methodologies applied
+  - name: industry_risk
+    description: Array of industry risk
+  - name: industry_risk_score
+    description: Array of industry risk scores
+  - name: industry_weight
+    description: Array of industry weights
+  - name: sys_valid_from
+    description: System timestamp indicating when this row was ingested into the database.
+      Start of the audit timeline.
+  - name: sys_valid_to
+    description: System timestamp indicating when this row was superseded by a newer
+      upload in the database. Null if it is currently the latest physically uploaded
+      row.
+  - name: is_system_current
+    description: Boolean flag indicating if this row is the most recent physical upload
+      for the company.
+  - name: is_latest_version_for_business_year
+    description: Boolean flag indicating if this row represents the highest version
+      (the 'truth') for its business year, regardless of when it was uploaded.

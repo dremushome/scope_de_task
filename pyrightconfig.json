@@ -1,0 +1,10 @@
+{
+  "extraPaths": [
+    "airflow"
+  ],
+  "pythonPlatform": "Linux",
+  "pythonVersion": "3.13",
+  "useLibraryCodeForTypes": true,
+  "venv": ".venv",
+  "venvPath": "."
+}

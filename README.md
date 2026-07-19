@@ -1,237 +1,111 @@
-# Senior Data Engineer Assignment - Corporate Credit Rating Data Pipeline
+# Corporate Credit Rating Data Pipeline
 
-## Overview
-Build a production-ready data pipeline that extracts corporate metadata from the MASTER sheet of Excel files, models it in a dimensional warehouse with temporal tracking, and exposes it through a RESTful API. The entire solution must be containerized using Docker Compose.
+A containerized, production-grade data pipeline that orchestrates the ingestion, validation, and dimensional modeling of corporate credit rating assessments from Excel files into a PostgreSQL data warehouse, exposing the resulting dataset through a FastAPI REST service.
 
-## Scenario
-You work for a credit rating analytics firm (similar to S&P, Moody's, Fitch). Analysts upload Excel-based rating assessments for corporate entities. Each Excel file contains multiple sheets, but **you only need to extract the MASTER sheet**, which contains:
-- Company metadata (entity name, sector, country, currency)
-- Rating methodology information
-- Industry risk scores and weights
-- Accounting principles and business year-end data
+---
 
-The MASTER sheet has a non-standard structure (key-value pairs with "Unnamed" column headers) that requires custom parsing.
+## Project Structure
 
-Your task is to build a data platform that enables:
-- Historical tracking of all rating submissions (requirement #1)
-- Point-in-time company comparisons (requirement #2)
-- Time-series analysis of individual companies (requirement #3)
-- Version control for multiple uploads per company/discussion (requirement #4)
-- Data classification for countries, company names, currencies (requirement #5)
-- Time-series data availability (requirement #6)
-- Data validation (requirement #7)
-- BI tool integration (requirement #8)
+* **`dags/`**: Apache Airflow DAGs orchestrating the pipeline.
+* **`tests/fixtures/`**: Repository-tracked sample rating files (`.xlsm`) used as test fixtures.
+* **`.data/`**: Git-ignored runtime directory where the pipeline reads source files (bootstrapped from fixtures).
+* **`config/` / `plugins/`**: Airflow configuration and plugin modules.
+* **`Makefile` / `setup.sh`**: Environment bootstrapping and orchestration scripts.
 
-## Task Breakdown
+---
 
-### 1. Data Extraction & Ingestion
-**Challenges:**
-- Extract data from .xlsm files (Excel with macros) - **MASTER sheet only**
-- Handle non-standard headers (many "Unnamed: X" columns requiring custom parsing)
-- MASTER sheet has key-value pair structure (40 rows × 13 columns)
-- Column headers are "Unnamed: 0-12", actual labels in column 1, values in column 2
-- Preserve file-level metadata (upload timestamp, source filename, version info)
+## Quick Start & Local Setup
 
-**Requirements:**
-- Create extraction module that handles MASTER sheet from each file
-- Implement custom parsing for key-value pair structure (not standard table format)
-- Extract company metadata:
-  - Rated entity name
-  - Corporate sector classification
-  - Rating methodologies applied
-  - Industry risk scores and weights
-  - Currency, country, accounting principles
-  - Business year-end month
-- Generate data quality reports per file (missing fields, invalid values)
-- Track data lineage (source file → extracted data → database table)
+> [!IMPORTANT]
+> The setup scripts (`setup.sh` and the `Makefile`) are specifically designed and tested for a **Linux VM / Linux environment** (e.g. Ubuntu, Debian, Fedora) running Docker.
 
-**Business Context:**
-- Files: corporates_A_1.xlsm, corporates_A_2.xlsm, corporates_B_1.xlsm, corporates_B_2.xlsm
-- A_1 vs A_2: Same company, different versions (industry risk A → BBB)
-- B_1 vs B_2: Same company, different versions (weight changes)
-- Only MASTER sheet needs to be extracted per file
+A helper script and `Makefile` are provided to automate the local environment configuration (creating the `.env` file, verifying dependencies, and bootstrapping the data folder).
 
-### 2. Data Modeling & Warehouse Design
-**Challenges:**
-- Design dimensional model for corporate metadata tracking
-- Implement temporal tracking (point-in-time + time-series)
-- Handle version control for multiple uploads per company/discussion
-- Model multi-currency data (EUR, CHF)
-- Handle slowly changing dimensions for company metadata
+### 1. Bootstrapping the Environment
 
+Run the setup using the `Makefile` (or run `setup.sh` directly if `make` is not yet installed on your host):
 
-### 3. Data Pipeline Orchestration
-**Challenges:**
-- Implement incremental loading (only process new/changed files)
-- Handle pipeline failures gracefully (transaction management)
-- Ensure idempotency (re-run same file → no duplicates)
-- Track pipeline execution state
-- Validate extracted data
+```bash
+# Using the Makefile
+make setup
 
-**Requirements:**
-- Create ETL pipeline with clear stages: Extract → Validate → Transform → Load
-- Implement **validation rules** (requirement #7)
-- Add retry logic with exponential backoff for transient failures
-- Log pipeline execution metrics (files processed, rows extracted, errors, duration)
-- Maintain pipeline state (last successful run, processed files list)
-- Generate data quality report per run (validation failures, warnings, summary stats)
+# Or using the raw shell script directly
+chmod +x setup.sh && ./setup.sh
+```
 
-**Validation Framework:**
-- Check required fields are present
-- Validate data types (numeric, text, date)
-- Validate numeric ranges (weights sum to 1.0, scores in valid range)
-- Flag missing or suspicious values
-- Report on data quality metrics (completeness, validity rates)
+This will automatically:
+1. **Generate `.env`**: Creates the environment file from `.env.example`, setting the `AIRFLOW_UID` to your host's UID (preventing volume permission errors) and generating a cryptographically secure `FERNET_KEY`.
+2. **Verify Dependencies**: Checks for the installation of Astral `uv`, Docker, and Docker Compose. If missing, it will attempt installation (via `apt`/`dnf` package managers) or guide you on manual setup.
+3. **Seed Local Data**: Creates the local ignored `.data/` directory and copies the Excel sample files into it from `tests/fixtures/`.
 
-### 4. API Development with FastAPI
-**Challenges:**
-- Design RESTful endpoints for complex analytical queries
-- Support point-in-time queries (requirement #2)
-- Support time-series queries (requirement #6)
-- Handle version navigation (requirement #4)
-- Implement BI-friendly data access (requirement #8)
+---
 
-**Requirements:**
-- **Company Endpoints:**
-  - GET /companies - List all companies with current metadata
-  - GET /companies/{company_id} - Get company details (latest version)
-  - GET /companies/{company_id}/versions - Get all versions for a company (requirement #4)
-  - GET /companies/{company_id}/history - Get time-series data for analysis (requirement #3)
-  - GET /companies/compare - Compare multiple companies at specific point in time (requirement #2)
-    - Query params: company_ids, as_of_date
+## Commands Reference
 
-- **Snapshot Endpoints:**
-  - GET /snapshots - List all company snapshots with filters
-    - Query params: company_id, from_date, to_date, sector, country, currency
-  - GET /snapshots/{snapshot_id} - Get specific snapshot details
-  - GET /snapshots/latest - Get latest snapshot for each company
+### System Requirements
+- **Docker & Docker Compose** installed
+- **Memory**: The local Docker cluster actively consumes around **2GB of RAM** when idling (Airflow + MinIO + PostgreSQL + FastAPI). However, it is highly recommended to allocate **at least 4GB of RAM** to Docker to ensure stable operation during data ingestion peaks and to prevent Out-Of-Memory (OOM) kills.
 
-- **Upload Audit Endpoints:**
-  - GET /uploads - List all file uploads with metadata (requirement #1)
-  - GET /uploads/{upload_id}/details - Get specific upload details
-  - GET /uploads/{upload_id}/file - Download original file (requirement #1)
-  - GET /uploads/stats - Upload statistics and metrics
+Once your environment is bootstrapped, you can manage the containerized cluster using `make` commands:
 
-- **Technical:**
-  - Pydantic models for request/response validation
-  - OpenAPI/Swagger documentation
-  - Proper HTTP status codes and error messages
+| Command | Action | Description |
+| :--- | :--- | :--- |
+| `make setup` | `./setup.sh` | Performs initial environment checks, generates `.env`, and seeds the data folder. |
+| `make up` | `docker compose up -d` | Starts the entire cluster (Airflow scheduler, worker, webserver, databases, etc.) in detached mode. |
+| `make down` | `docker compose down` | Stops and removes running containers, networks, and services. |
+| `make logs` | `docker compose logs -f` | Follows and displays real-time container log output. |
+| `make build` | `docker compose build` | Rebuilds custom Airflow or API images defined in the docker services. |
+| `make clean` | `rm -rf .data/*.xlsm` | Deletes the copied Excel assessment files from the local `.data/` folder. |
 
-### 5. Containerization & Infrastructure
-**Challenges:**
-- Multi-container orchestration with proper dependencies
-- Data persistence across container restarts
-- Environment configuration management
-- Health checks and startup order
+*Note: If you do not have `make` installed on your machine, you can run the equivalent commands directly (e.g., `docker compose up -d` or `./setup.sh`).*
 
-**Requirements:**
-- **Docker Compose** with services:
-  ```yaml
-  services:
-    postgres:
-      - PostgreSQL 15+ for data warehouse
-      - Initialize with schema on first run
-      - Volume for data persistence
-      - Health check endpoint
+---
 
-    api:
-      - FastAPI application
-      - Depends on postgres health
-      - Volume mount for data files
-      - Environment variables for config
-      - Exposed on port 8000
-  ```
+## Local Services & Credentials
 
-- **One-command startup:**
-  ```bash
-  docker-compose up -d
-  ```
+Once the cluster is up and running (`make up`), you can access the various services through your browser. 
 
-## Requirements & Evaluation Criteria
+Here are the default URLs and credentials configured via `setup.sh` and `docker-compose.yaml`:
 
-### 1. Data Engineering
-- Robust Excel extraction with non-standard header handling
-- Efficient data management
-- Comprehensive data quality checks and reporting
-- Data lineage tracking from source to warehouse
-- Proper error handling and logging
+| Service | URL | Username | Password | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Apache Airflow** | [http://localhost:8080](http://localhost:8080) | `airflow` | `airflow` | The DAG orchestration UI to trigger pipeline runs and monitor logs. |
+| **MinIO Console** | [http://localhost:9001](http://localhost:9001) | `minioadmin` | `minioadmin` | S3-compatible object storage UI to browse raw files in the landing bucket. |
+| **FastAPI Swagger** | [http://localhost:8000/docs](http://localhost:8000/docs) | *N/A* | *N/A* | Interactive Swagger UI to query the processed credit rating data. |
+| **PostgreSQL (DWH)** | `localhost:5432` (DB: `dwh`) | `warehouse_user` | `warehouse_password` | The underlying data warehouse. Connect via a SQL client like DBeaver or DataGrip. |
+| **dbt Docs** | [http://localhost:8081](http://localhost:8081) | *N/A* | *N/A* | Interactive data lineage graph. *Note: You must start this manually by running: `cd dwh/dbt && uv run --env-file ../../.env dbt docs generate && uv run --env-file ../../.env dbt docs serve --port 8081`* |
 
-### 2. Data Modeling & System Design
-- Well-designed dimensional model (star schema)
-- Version control strategy for multiple uploads
-- Appropriate indexing and partitioning
-- Meets all 8 business requirements from Requirements sheet
+For more details on the transformation layer (dbt), please refer to the dedicated [dbt README](dwh/dbt/README.md).
 
-### 3. Pipeline Orchestration
-- Validation framework
-- State management (tracking processed files)
-- Comprehensive error handling and retry logic
-- Data quality reporting
-- Monitoring and logging
+---
 
-### 4. API Design & Implementation
-- Clean RESTful API design
-- Point-in-time and time-series query support
-- Complex filtering and aggregation
-- BI-friendly data access
-- Proper validation and error handling
-- Complete OpenAPI documentation
+## End-to-End Walkthrough
 
-### 5. Infrastructure & Containerization
-- Working Docker Compose with all services
-- Proper service orchestration and dependencies
-- Data persistence configuration
-- Health checks implemented
-- Environment variable management
-- One-command startup
+If this is your first time spinning up the project, follow these steps to see the entire pipeline in action:
 
-### 6. Code Quality (Qualitative)
-- Clean architecture (separation of concerns)
-- Type hints throughout
-- Unit and integration tests
-- Logging and monitoring
-- Code documentation
+1. **Bootstrap and Start the Cluster**
+   From the root of the repository, initialize the environment and start the containers:
+   ```bash
+   make setup
+   make up
+   ```
+   *Wait a few seconds for the containers (especially Airflow and PostgreSQL) to become healthy.*
 
-## Deliverables
+2. **Seed the Landing Bucket**
+   Before seeding, your MinIO buckets will be completely empty. Upload the test Excel files into the MinIO `landing` bucket:
+   ```bash
+   make seed
+   ```
+   *You can verify the files arrived by logging into the [MinIO Console](http://localhost:9001) using `minioadmin` / `minioadmin` and checking the `landing` bucket.*
 
-1. **Source Code Repository**
+3. **Run the Airflow DAG**
+   - Open [Apache Airflow](http://localhost:8080) in your browser and log in with `airflow` / `airflow`.
+   - You should see a DAG named something like `corporate_ratings_pipeline`.
+   - Click the **"Trigger DAG"** (play button) to start the run.
+   - Click on the DAG to watch the tasks succeed in the Graph or Grid view as it ingests the files, parses them, and runs the `dbt` models.
+   - **Check MinIO Again:** Once the DAG finishes, if you look back at MinIO, you will see the `landing` bucket is empty again, and all the files have been safely moved to the `archive` bucket!
 
-2. **Docker Compose Setup**
-
-3. **Sample Outputs**
-   - At least 10 API call examples with responses
-   - Data quality report example
-   - Pipeline execution log example
-
-4. **Tests**
-
-7. **AI Usage Disclosure** (REQUIRED)
-   - Create AI_USAGE.md documenting:
-     - Which AI tools used (ChatGPT, Claude, Copilot, etc.)
-     - Which components received AI assistance
-     - Chat logs/screenshots (can redact personal info)
-
-## Tech Stack
-
-**Required:**
-- Python 3.10+
-- FastAPI (web framework)
-- PostgreSQL (data warehouse)
-- Docker & Docker Compose
-- SQLAlchemy (ORM) or raw SQL
-
-
-## Non-Goals
-
-You do NOT need to:
-- Build a frontend UI (focus on API only)
-- Implement authentication/authorization
-- Deploy to cloud (AWS/Azure/GCP)
-- Implement real-time streaming
-- Handle production monitoring at scale
-- Support Excel file uploads via API (files provided in data/ directory)
-
-
-## Task Timeline
-
-Complete within **5-7 days**.
+4. **Query the Data API**
+   Once the DAG completes successfully, the data is in the Data Warehouse.
+   - Open the [FastAPI Swagger UI](http://localhost:8000/docs).
+   - Try executing the `GET /snapshots/latest` endpoint to see the final, modeled credit ratings data served directly from the `marts.dim_corporate_ratings` table!

@@ -1,0 +1,7 @@
+version: 2
+
+sources:
+  - name: ingestion
+    schema: ingestion
+    tables:
+      - name: raw_corporate_credit_ratings
