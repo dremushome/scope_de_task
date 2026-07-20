@@ -12,7 +12,8 @@
 ## 3. Slowly Changing Dimensions (SCD) & Bitemporal Modeling
 **Decision:** We implemented a "Hybrid" Bitemporal SCD approach for determining the current state of a company in `dim_companies_current`.
 - **Context:** If we strictly use the upload timestamp (`updated_at`) to define the "latest" record, an out-of-order upload (e.g., an analyst uploading a 2022 assessment *after* a 2023 assessment is already uploaded) would incorrectly overwrite the 2023 record as the current state of the company. 
-- **Implementation:** We track two timelines. The ranking logic prioritizes the "Business Time" (the highest `metric_year` where type is 'Actual') first. It then uses "System Time" (the explicit file version, and finally `updated_at`) as tie-breakers. This ensures the "current" view is always the most recent financial statement, protecting against late-arriving historical data.
+- **Missing Analysis Date:** Standard financial datasets explicitly provide an "Analysis Date" or "Evaluation Date". Because this was absent from the raw Excel templates, we could not rely on an explicit business timeline.
+- **Implementation:** We track two timelines. The ranking logic prioritizes the "Business Time" (the highest `metric_year` where type is 'Actual') first. It then uses "System Time" (the explicit file version, and finally `updated_at`) as tie-breakers. This ensures the "current" view is always the most recent financial statement, protecting against late-arriving historical data and the lack of an explicit evaluation date.
 
 ## 4. Surrogate Keys (`upload_id`)
 **Decision:** We propagate the surrogate key `upload_id` all the way down into the final mart models.

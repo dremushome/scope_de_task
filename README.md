@@ -15,6 +15,12 @@ A containerized, production-grade data pipeline that orchestrates the ingestion,
 
 ---
 
+## Data Constraints & Assumptions
+
+- **Missing Analysis Date:** Standard financial rating datasets typically include an explicit "Analysis Date" or "Evaluation Date". Because this was absent from the provided raw Excel templates, our data modeling pipeline dynamically infers the business timeline using the "max actual business year" combined with the system upload timestamps to maintain an accurate bitemporal history.
+
+---
+
 ## Project Structure
 
 * **`dags/`**: Apache Airflow DAGs orchestrating the pipeline.
