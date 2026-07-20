@@ -1,6 +1,7 @@
 {
   "extraPaths": [
-    "airflow"
+    "airflow",
+    "airflow/dags/"
   ],
   "pythonPlatform": "Linux",
   "pythonVersion": "3.13",
